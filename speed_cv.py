@@ -318,10 +318,10 @@ def publish_predictions_b(predictions, test_frames, filename):
         # Assume you have 'left_line' and 'right_line' representing line coordinates
 
         # -- Superimpose Lines --
-        lines_overlay = np.zeros_like(frame)
-        cv2.line(lines_overlay, left_line[0], left_line[1], (0, 255, 0), 5)
-        cv2.line(lines_overlay, right_line[0], right_line[1], (0, 255, 0), 5)
-        frame = cv2.addWeighted(frame, 1, lines_overlay, 0.7, 0)
+        overlay = np.zeros_like(frame)
+        cv2.line(overlay, left_line[0], left_line[1], (0, 255, 0), 5)
+        cv2.line(overlay, right_line[0], right_line[1], (0, 255, 0), 5)
+        frame = cv2.addWeighted(frame, 1, overlay, 0.7, 0)
 
         # -- Add Prediction Text --
         # prediction_text = "Speed: {:.2f}".format(predictions[i])
@@ -336,86 +336,66 @@ def publish_predictions_b(predictions, test_frames, filename):
 
 def publish_predictions(predictions, test_frames, filename):
 
-    """
-    Creates a video with lane lines and speed predictions superimposed.
-
-    Args:
-        predictions (np.ndarray): Array of speed predictions (x, 1).
-        test_frames (np.ndarray): Array of video frames (x, 320, 240, 3).
-    """
-
     num_frames = predictions.shape[0] 
     newVideo: cv2.VideoWriter = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'XVID'), 20, (320, 240))  # Adjust frame rate as needed
 
-    print("test_frames.shape = ", test_frames.shape, test_frames.dtype)
     # Remove the second dimension
     test_frames = np.squeeze(test_frames, axis=1)
 
-    print("test_frames.shape = ", test_frames.shape, test_frames.dtype)
-    print("predictions.shape = ", predictions.shape, predictions.dtype)
-    
-
     for i in range(num_frames):
         frame = test_frames[i]
-        # print("frame.shape = ", frame.shape, frame.dtype)
+        overlay = np.zeros_like(frame)
+
         shrunken = shrink_img(frame)
-        print("shrunken.shape = ", shrunken.shape, shrunken.dtype)
-        
-        # Lane Detection (implement your preferred method here)
-        # uint = shrunken * 255
         converted = shrunken.astype(np.uint8)
-
-        # display_image("converted", converted)
         gray = cv2.cvtColor(converted, cv2.COLOR_BGR2GRAY)
-        # display_image("gray", gray)
 
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)  # Reduce noise
-        # display_image("blurred", blurred)
-        edges = cv2.Canny(blurred, 50, 150)  # Adjust thresholds for Canny
-        # display_image("edges", edges)
+        # blurred = cv2.GaussianBlur(gray, (5, 5), 0)  # Reduce noise
 
+        edges = cv2.Canny(gray, 50, 150)  # Adjust thresholds for Canny
 
-        # Identify the vertices of the wedge shape
+        # Region of Interest: Identify the vertices of the wedge shape
         height = edges.shape[0]
         width = edges.shape[1]
+
         vertices = np.array(
-            [[(0, height-10), (width, height-10), (width/2, height*0.45)]], dtype=np.int32)
+            [[(0, height-100), (width, height-100), (width/2, height*0.35)]], dtype=np.int32)
+        
         # Ignore everything outside the wedge
         roi = region_of_interest(edges, vertices)
-        # print("roi.shape = ", roi.shape, roi.dtype)
-        # display_image("roi", roi)
-        # roi = np.expand_dims(roi, axis=2)
-
-
+        
         lines = cv2.HoughLinesP(roi,  # Consider HoughLines for less strict detection
-                                1, np.pi / 180, 20, minLineLength=10, maxLineGap=20)
+                                1, np.pi / 180, 20, minLineLength=70, maxLineGap=20)
 
         if lines is not None:
-
+            left_lines = []
+            right_lines = []
             for line in lines:
                 x1, y1, x2, y2 = line[0]
-                cv2.line(shrunken, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                slope = (y2 - y1) / (x2 - x1)  # Calculate the slope
+                if slope < 0:  # If the slope is negative, the line is on the left
+                    left_lines.append(line)
+                else:  # Otherwise, the line is on the right
+                    right_lines.append(line)
 
-        print("shrunken.shape = ", shrunken.shape, shrunken.dtype)
-        # display_image("shrunken", shrunken)
+            left_line = [[]]
+            right_line = [[]]
+            if len(left_lines) > 0:
+                left_line = np.mean(left_lines, axis=0, dtype=np.int32)
+            if len(right_lines) > 0:
+                right_line = np.mean(right_lines, axis=0, dtype=np.int32)
+    
+            for line in [left_line, right_line]: 
+                if len(line[0]) == 0:
+                    continue
+                x1, y1, x2, y2 = line[0] # for line in lines:
+                cv2.line(overlay, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-        # Prediction Text Superimposition
-        # prediction_text = f"Speed: {:.2f}".format(predictions[i])
-        # cv2.putText(frame, f"Predicted Speed: {prediction:.2f} km/h", 
-        cv2.putText(shrunken, str(predictions[i]), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
-                    1, (100, 0, 255), 2)
-        # cv2.putText(image, str(prediction), (10, 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        cv2.putText(overlay, str(predictions[i]), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
+                    0.7, (100, 0, 255), 2)
 
-        # display_image("frame", frame)
-
-        # is the file shrunken compatible with the video writer?
-        print("shrunken.shape = ", shrunken.shape, shrunken.dtype)
-
-        # print newVideo dimensions and type, and shrunk dimensions and type, for comparison
-        # print("newVideo: ", newVideo)
-        # print("shrunken: ", shrunken)
-
-        newVideo.write(shrunken)
+        frame = cv2.addWeighted(frame, 1, overlay, 0.7, 0)
+        newVideo.write(frame)
         
     newVideo.release()
     return filename
