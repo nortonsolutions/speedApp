@@ -299,21 +299,23 @@ def weighted_average_line(lines, prev_lines):
     if not lines:
         return None
 
+    # Calculate the distance between each line and the previous lines
+     
     if prev_lines is None:
         prev_lines = np.zeros_like(lines)
     
-    # Calculate the distance between each line and the previous frame's lines
-    distances = np.array([np.linalg.norm(line - prev_line) for line, prev_line in zip(lines, prev_lines)])
+    distances = np.array([np.min(np.linalg.norm(line - prev_lines, axis=1)) for line in lines])
 
     # Calculate the weights based on the distances
-    weights = 1 / (distances + 1)  # Add 1 to avoid division by zero
+    weights = np.exp(-distances / np.mean(distances))
 
     # Normalize the weights
-    weights = weights / weights.sum()
+    weights /= np.sum(weights)
 
     # Calculate the weighted average line
     weighted_lines = np.array([line * w for line, w in zip(lines, weights)])
     return np.sum(weighted_lines, axis=0).astype(np.int32)[0]
+
 
 def weighted_average_line_a(lines, prev_lines):
     if not lines:
