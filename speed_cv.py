@@ -121,7 +121,7 @@ def identify_line_slopes(img):
 def draw_lines(img, lines, color=[255, 0, 0], thickness=3):
     # Create a blank image that matches the original image
     # img = np.squeeze(img, axis=0)
-    # print("img.shape in draw_lines = ", img.shape)
+    print("img.shape in draw_lines = ", img.shape)
     
     line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
 
@@ -286,27 +286,64 @@ def publish_predictions_orig(predictions, testFrames, filename):
 
 
 
-def weighted_average_line(lines):
-    """Calculates a weighted average of lines."""
-    if not lines:
-        return None  
+# def weighted_average_line(lines):
+#     """Calculates a weighted average of lines."""
+#     if not lines:
+#         return None  
 
-    weights = np.linspace(1, 0.5, len(lines))  # More weight to recent lines
+#     weights = np.linspace(1, 0.5, len(lines))  # More weight to recent lines
+#     weighted_lines = np.array([line * w for line, w in zip(lines, weights)])
+#     return np.sum(weighted_lines, axis=0).astype(np.int32)[0]
+
+def weighted_average_line(lines, prev_lines):
+    if not lines:
+        return None
+
+    if prev_lines is None:
+        prev_lines = np.zeros_like(lines)
+    
+    # Calculate the distance between each line and the previous frame's lines
+    distances = np.array([np.linalg.norm(line - prev_line) for line, prev_line in zip(lines, prev_lines)])
+
+    # Calculate the weights based on the distances
+    weights = 1 / (distances + 1)  # Add 1 to avoid division by zero
+
+    # Normalize the weights
+    weights = weights / weights.sum()
+
+    # Calculate the weighted average line
     weighted_lines = np.array([line * w for line, w in zip(lines, weights)])
     return np.sum(weighted_lines, axis=0).astype(np.int32)[0]
 
+def weighted_average_line_a(lines, prev_lines):
+    if not lines:
+        return None
+    
+    # Calculate the distance between each line and the previous lines
+    distances = np.array([np.min(np.linalg.norm(line - prev_lines, axis=1)) for line in lines])
+
+    # Calculate the weights based on the distances
+    weights = np.exp(-distances / np.mean(distances))
+
+    # Normalize the weights
+    weights /= np.sum(weights)
+
+    # Calculate the weighted average line
+    weighted_lines = np.array([line * w for line, w in zip(lines, weights)])
+    return np.sum(weighted_lines, axis=0).astype(np.int32)[0]
+
+def combine_frame_and_overlay(frame, overlay):
+    return cv2.addWeighted(frame, 1, overlay, 0.7, 0)
+
 def preprocess_frame(frame):
-    # shrunken = shrink_img(frame)
-    # 
-
-    # edges = cv2.Canny(gray, 50, 150)  # Adjust thresholds for Canny
-
-    gray = grayscale(frame)
-    blur = gaussian_blur(gray, 5)
-    edges = canny(blur, 50, 150)
+    shrunken = shrink_img(frame)
+    converted = shrunken.astype(np.uint8)
+    gray = cv2.cvtColor(converted, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150)
     return edges
 
 def define_roi(frame):
+    print("define_roi: frame.shape = ", frame.shape)
     height = frame.shape[0]
     width = frame.shape[1]
     vertices = np.array(
@@ -342,41 +379,71 @@ def separate_lines(lines):
     return left_lines, right_lines
 
 def calculate_weighted_average_line(lines):
-    # implement weighted average calculation
-    pass
+    if not lines:
+        return None
+    weights = np.array([i for i in range(len(lines))])
+    weights = weights / weights.sum()
+    weighted_lines = np.array([line[0] for line in lines])
+    weighted_average_line = np.dot(weights, weighted_lines)
+    return weighted_average_line
+
+# def calculate_weighted_average_line(lines):
+#     if len(lines) == 0:
+#         return None
+
+#     weights = np.linspace(0.1, 1, len(lines))
+#     weights = weights / np.sum(weights)
+
+#     weighted_sum_x1 = np.sum([line[0][0] * weight for line, weight in zip(lines, weights)])
+#     weighted_sum_y1 = np.sum([line[0][1] * weight for line, weight in zip(lines, weights)])
+#     weighted_sum_x2 = np.sum([line[0][2] * weight for line, weight in zip(lines, weights)])
+#     weighted_sum_y2 = np.sum([line[0][3] * weight for line, weight in zip(lines, weights)])
+
+#     return [(int(weighted_sum_x1), int(weighted_sum_y1), int(weighted_sum_x2), int(weighted_sum_y2))]
+
 
 def draw_lines(overlay, lines):
     for line in lines:
-        x1, y1, x2, y2 = line
+        print("line = ", line)
+        if line is None:
+            continue
+        if len(line) == 0:
+            continue
+        x1, y1, x2, y2 = line # for line in lines:
         cv2.line(overlay, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+        # x1, y1, x2, y2 = line
+        # cv2.line(overlay, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
 def add_text(overlay, text):
     cv2.putText(overlay, str(text), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 0, 255), 2)
 
-def combine_frame_and_overlay(frame, overlay):
-    return cv2.addWeighted(frame, 1, overlay, 0.7, 0)
-
 def publish_predictions(lane_predictions, video_frames, filename, slope_threshold=0.4):
-
-    print("lane_predictions.shape = ", lane_predictions.shape)
-    
-    print("video_frames.shape = ", video_frames.shape)
-    
     num_frames = len(video_frames)
     newVideo = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'XVID'), 20, (320, 240))
-
+    previous_left_lines = None
+    previous_right_lines = None
     for i in range(num_frames):
         frame = video_frames[i]
         edges = preprocess_frame(frame)
-        roi = define_roi(frame)
+        vertices = define_roi(frame)
+        roi = region_of_interest(edges, vertices)
+        
         lines = detect_lines(edges, roi)
-        filtered_lines = filter_lines(lines, slope_threshold)
-        left_lines, right_lines = separate_lines(filtered_lines)
-        left_line = calculate_weighted_average_line(left_lines)
-        right_line = calculate_weighted_average_line(right_lines)
-
         overlay = np.zeros_like(frame)
-        draw_lines(overlay, [left_line, right_line])
+        
+        if lines is not None:
+            filtered_lines = filter_lines(lines, slope_threshold)
+            left_lines, right_lines = separate_lines(filtered_lines)
+            left_line = weighted_average_line(left_lines, previous_left_lines)
+            print("left_line = ", left_line)
+            right_line = weighted_average_line(right_lines, previous_right_lines)
+
+            previous_left_lines = left_lines
+            previous_right_lines = right_lines
+
+            draw_lines(overlay, [left_line, right_line])
+
         add_text(overlay, lane_predictions[i])
         combined_frame = combine_frame_and_overlay(frame, overlay)
         newVideo.write(combined_frame)
