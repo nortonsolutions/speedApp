@@ -22,8 +22,11 @@
 # - shrink_img: resize the image to 320x240 pixelscheckIfModelExists
 
 import dis
+from turtle import right
 import numpy as np
 import cv2
+import math
+
 # import keras.backend a
 from tensorflow.keras import backend as K
 
@@ -170,7 +173,7 @@ def region_of_interest(img, vertices):
 # Grayscale the image
 def grayscale(img):
     # img = np.squeeze(img, axis=0)
-    # print("img.shape in grayscale = ", img.shape)
+    print("img.shape in grayscale = ", img.shape)
     img_bw = img.astype(np.uint8)
     img_bw =  cv2.cvtColor(img_bw, cv2.COLOR_RGB2GRAY)
 
@@ -281,124 +284,140 @@ def publish_predictions_orig(predictions, testFrames, filename):
     
     return filename
 
-def publish_predictions_b(predictions, test_frames, filename):
-    """
-    Publishes predictions from a model in video format, processing a video from
-    the perspective of a car driver through the windshield.
 
-    Args:
-        predictions (np.ndarray): A 1D array of speed predictions (float32).
-        test_frames (np.ndarray): A 4D array representing video frames (float32),
-                                  with shape (x, 320, 240, 3).
 
-    Returns:
-        None (Modifies frames in-place and saves the output video)
-    """
+def weighted_average_line(lines):
+    """Calculates a weighted average of lines."""
+    if not lines:
+        return None  
 
-    # Check if there are frames and predictions to process
-    if len(test_frames) == 0 or len(predictions) == 0:
-        print("Error: No frames or predictions provided")
-        return
+    weights = np.linspace(1, 0.5, len(lines))  # More weight to recent lines
+    weighted_lines = np.array([line * w for line, w in zip(lines, weights)])
+    return np.sum(weighted_lines, axis=0).astype(np.int32)[0]
 
-    # Output video setup
-    out = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'mp4v'), 30, (320, 240))
+def preprocess_frame(frame):
+    # shrunken = shrink_img(frame)
+    # 
 
-    # Remove the second dimension
-    test_frames = np.squeeze(test_frames, axis=1)
+    # edges = cv2.Canny(gray, 50, 150)  # Adjust thresholds for Canny
 
-    # Iterate through frames and predictions
-    for i, (frame, prediction) in enumerate(zip(test_frames, predictions)):
+    gray = grayscale(frame)
+    blur = gaussian_blur(gray, 5)
+    edges = canny(blur, 50, 150)
+    return edges
 
-        # -- Lane Line Detection --
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  
-        blur = cv2.GaussianBlur(gray, (5, 5), 0)  # Blur to reduce noise
-        canny = cv2.Canny(blur, 50, 150)  # Canny edge detection
+def define_roi(frame):
+    height = frame.shape[0]
+    width = frame.shape[1]
+    vertices = np.array(
+        [[(0, height-100), (width, height-100), (width/2, height*0.35)]], dtype=np.int32)
+    return vertices
 
-        # ... Your lane line fitting logic here ...
-        # Assume you have 'left_line' and 'right_line' representing line coordinates
+def detect_lines(edges, roi):
+    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 20, minLineLength=70, maxLineGap=20)
+    return lines
 
-        # -- Superimpose Lines --
-        overlay = np.zeros_like(frame)
-        cv2.line(overlay, left_line[0], left_line[1], (0, 255, 0), 5)
-        cv2.line(overlay, right_line[0], right_line[1], (0, 255, 0), 5)
-        frame = cv2.addWeighted(frame, 1, overlay, 0.7, 0)
+def filter_lines(lines, slope_threshold):
+    filtered_lines = []
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        dx = x2 - x1
+        dy = y2 - y1
+        if dx != 0:
+            slope = abs(dy / dx)
+            if slope > slope_threshold:
+                filtered_lines.append(line)
+    return filtered_lines
 
-        # -- Add Prediction Text --
-        # prediction_text = "Speed: {:.2f}".format(predictions[i])
-        # cv2.putText(frame, f"Predicted Speed: {prediction:.2f} km/h", 
-        cv2.putText(frame, str(predictions[i]),
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+def separate_lines(lines):
+    left_lines = []
+    right_lines = []
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        slope = (y2 - y1) / (x2 - x1)
+        if slope < 0:
+            left_lines.append(line)
+        else:
+            right_lines.append(line)
+    return left_lines, right_lines
 
-        # frame looks perfect right now.  Write it to the output video
+def calculate_weighted_average_line(lines):
+    # implement weighted average calculation
+    pass
 
-    out.release()
-    return filename
+def draw_lines(overlay, lines):
+    for line in lines:
+        x1, y1, x2, y2 = line
+        cv2.line(overlay, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-def publish_predictions(predictions, test_frames, filename):
+def add_text(overlay, text):
+    cv2.putText(overlay, str(text), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 0, 255), 2)
 
-    num_frames = predictions.shape[0] 
-    newVideo: cv2.VideoWriter = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'XVID'), 20, (320, 240))  # Adjust frame rate as needed
+def combine_frame_and_overlay(frame, overlay):
+    return cv2.addWeighted(frame, 1, overlay, 0.7, 0)
 
-    # Remove the second dimension
-    test_frames = np.squeeze(test_frames, axis=1)
+def publish_predictions(lane_predictions, video_frames, filename, slope_threshold=0.4):
+
+    print("lane_predictions.shape = ", lane_predictions.shape)
+    
+    print("video_frames.shape = ", video_frames.shape)
+    
+    num_frames = len(video_frames)
+    newVideo = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'XVID'), 20, (320, 240))
 
     for i in range(num_frames):
-        frame = test_frames[i]
+        frame = video_frames[i]
+        edges = preprocess_frame(frame)
+        roi = define_roi(frame)
+        lines = detect_lines(edges, roi)
+        filtered_lines = filter_lines(lines, slope_threshold)
+        left_lines, right_lines = separate_lines(filtered_lines)
+        left_line = calculate_weighted_average_line(left_lines)
+        right_line = calculate_weighted_average_line(right_lines)
+
         overlay = np.zeros_like(frame)
+        draw_lines(overlay, [left_line, right_line])
+        add_text(overlay, lane_predictions[i])
+        combined_frame = combine_frame_and_overlay(frame, overlay)
+        newVideo.write(combined_frame)
 
-        shrunken = shrink_img(frame)
-        converted = shrunken.astype(np.uint8)
-        gray = cv2.cvtColor(converted, cv2.COLOR_BGR2GRAY)
-
-        # blurred = cv2.GaussianBlur(gray, (5, 5), 0)  # Reduce noise
-
-        edges = cv2.Canny(gray, 50, 150)  # Adjust thresholds for Canny
-
-        # Region of Interest: Identify the vertices of the wedge shape
-        height = edges.shape[0]
-        width = edges.shape[1]
-
-        vertices = np.array(
-            [[(0, height-100), (width, height-100), (width/2, height*0.35)]], dtype=np.int32)
-        
-        # Ignore everything outside the wedge
-        roi = region_of_interest(edges, vertices)
-        
-        lines = cv2.HoughLinesP(roi,  # Consider HoughLines for less strict detection
-                                1, np.pi / 180, 20, minLineLength=70, maxLineGap=20)
-
-        if lines is not None:
-            left_lines = []
-            right_lines = []
-            for line in lines:
-                x1, y1, x2, y2 = line[0]
-                slope = (y2 - y1) / (x2 - x1)  # Calculate the slope
-                if slope < 0:  # If the slope is negative, the line is on the left
-                    left_lines.append(line)
-                else:  # Otherwise, the line is on the right
-                    right_lines.append(line)
-
-            left_line = [[]]
-            right_line = [[]]
-            if len(left_lines) > 0:
-                left_line = np.mean(left_lines, axis=0, dtype=np.int32)
-            if len(right_lines) > 0:
-                right_line = np.mean(right_lines, axis=0, dtype=np.int32)
-    
-            for line in [left_line, right_line]: 
-                if len(line[0]) == 0:
-                    continue
-                x1, y1, x2, y2 = line[0] # for line in lines:
-                cv2.line(overlay, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-        cv2.putText(overlay, str(predictions[i]), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
-                    0.7, (100, 0, 255), 2)
-
-        frame = cv2.addWeighted(frame, 1, overlay, 0.7, 0)
-        newVideo.write(frame)
-        
     newVideo.release()
     return filename
+
+# Currently unused
+def filter_lines_by_slope(lines, slope_threshold):
+    filtered_lines = []
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        dx = x2 - x1
+        dy = y2 - y1
+
+        # Calculate slope (avoid division by zero)
+        if dx != 0: 
+            slope = abs(dy / dx)
+            if slope > slope_threshold:
+                filtered_lines.append(line)
+
+    return filtered_lines
+
+# currently unused
+def get_smoothed_lines(lines):
+    left_lines = []
+    right_lines = []
+
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        slope = (y2 - y1) / (x2 - x1)
+        if slope < 0:
+            left_lines.append(line)
+        else:
+            right_lines.append(line)
+
+    # Weighted averaging (more recent lines get more weight)
+    left_line = weighted_average_line(left_lines)
+    right_line = weighted_average_line(right_lines)
+
+    return left_line, right_line
 
 # Open the video and play it
 def display_video(filename):

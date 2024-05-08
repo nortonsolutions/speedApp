@@ -27,6 +27,7 @@
 # - process_new_video: process a new video file, editing the video in place
 #
 #
+from cgi import test
 import os
 import configparser
 
@@ -48,7 +49,7 @@ from celery import shared_task
 # Configurable variables
 modelFile = "model.keras"
 learning_rate = 0.025
-epochs = 2
+epochs = 5
 batch_size = 32
 neurons = 32
 
@@ -64,7 +65,17 @@ conv3d = False
 
 predictionsFilename = "predictions.txt"
 
-def create_model_last():
+def create_model_2D():
+
+    # model = Sequential([
+    #     layers.Conv2D(neurons, (3, 3), activation='relu', input_shape=(320, 240, 1)),
+    #     layers.MaxPooling2D((2, 2)),
+    #     layers.Conv2D(neurons*2, (3, 3), activation='relu'),
+    #     layers.MaxPooling2D((2, 2)),
+    #     layers.Flatten(),
+    #     layers.Dense(neurons*2, activation='relu'),
+    #     layers.Dense(1)
+    # ])
 
     model = models.Sequential(
         [
@@ -196,17 +207,7 @@ def create_model(conv3d=False):
             layers.Dense(1)
         ])
     else:
-        return create_model_last()
-
-        # model = Sequential([
-        #     layers.Conv2D(neurons, (3, 3), activation='relu', input_shape=(320, 240, 1)),
-        #     layers.MaxPooling2D((2, 2)),
-        #     layers.Conv2D(neurons*2, (3, 3), activation='relu'),
-        #     layers.MaxPooling2D((2, 2)),
-        #     layers.Flatten(),
-        #     layers.Dense(neurons*2, activation='relu'),
-        #     layers.Dense(1)
-        # ])
+        return create_model_2D()
 
     model.compile(optimizer=optimizers.Adam(learning_rate=learning_rate), loss='mean_squared_error')
 
@@ -245,30 +246,32 @@ def train_model(model, frames, speeds, epochs=epochs, batch_size=batch_size):
     frames = pad_batch(frames, batch_size)
     speeds = pad_batch(speeds, batch_size)
 
+    print("Training model: frames.shape:", frames.shape, "speeds.shape:", speeds.shape)
+
+    if testmode is True:
+        frames = frames[:testmode_num_frames]
+        speeds = speeds[:testmode_num_frames]
+        print("testmode = true; frames.shape adjusted to:", frames.shape, "speeds.shape:", speeds.shape)
+        epochs = 1
+    else:
+        epochs = epochs
+
     try:
         # Define the callback 
         early_stopping = EarlyStopping(
             monitor='loss',  # Metric to monitor
-            patience=5,  # Number of epochs to wait before stopping
+            patience=2,  # Number of epochs to wait before stopping
             min_delta=0.001,  # Minimum change in the monitored quantity to qualify as an improvement
             restore_best_weights=True  # Restore model weights from the epoch with the best value
         )
 
+        # model.fit(frames, speeds, epochs=epochs, batch_size=batch_size)
         model.fit(frames, speeds, epochs=epochs, batch_size=batch_size, 
-                verbose=2, shuffle=False, validation_split=0.0, callbacks=[early_stopping])
+                shuffle=False, validation_split=0.3, callbacks=[early_stopping])
         # , steps_per_epoch=frames.shape[0]//batch_size)
     except Exception as e:
         raise e
 
-    print("Training model... frames.shape:", frames.shape, "speeds.shape:", speeds.shape)
-    if testmode is True:
-        frames = frames[:testmode_num_frames]
-        speeds = speeds[:testmode_num_frames]
-        epochs = 1
-    else:
-        epochs = epochs
-    print("Training model II ... frames.shape:", frames.shape, "speeds.shape:", speeds.shape)
-    model.fit(frames, speeds, epochs=epochs, batch_size=batch_size)
     return model
 
 def predict_speeds(model, frames):
@@ -284,6 +287,7 @@ def predict_speeds(model, frames):
 
     print("predicted_speeds.shape = ", predicted_speeds.shape)
     predicted_speeds = np.squeeze(predicted_speeds, axis=1)
+    
     np.savetxt(predictionsFilename, predicted_speeds, fmt='%d')
 
 
@@ -295,7 +299,7 @@ def check_if_model_exists(modelFile = modelFile):
     
     # print the current project working directory
     # print("os.getcwd() = ", os.getcwd())
-    if os.path.exists(modelFile):
+    if os.path.exists(modelFile) and testmode == False:
         print("WARNING: Loading model from pre-existing file.  Delete the file to retrain the model from scratch.")
         loaded_model: Sequential = None
         try:
@@ -346,7 +350,7 @@ def main():
 
     print("predicted_speeds.shape = ", predicted_speeds.shape)
 
-    filename = publish_predictions(predicted_speeds, test_frames)
+    filename = publish_predictions(predicted_speeds, test_frames, modelFile, slope_threshold=0.4)
     display_video(filename)
     
     # # Generate histogram of predicted speeds
@@ -379,6 +383,7 @@ def process_new_video(filename):
 
     # # Save the model
     # model.save(modelFile)
+    save_model(model, modelFile)
 
     # Load testing data
     test_frames, _ = load_data(test_filename, None, testmode=testmode, testmode_num_frames=testmode_num_frames, batch_size=batch_size)
@@ -388,25 +393,12 @@ def process_new_video(filename):
 
     print("predicted_speeds.shape = ", predicted_speeds.shape)
 
-    filename = publish_predictions(predicted_speeds, test_frames, filename)
+    test_frames = np.squeeze(test_frames, axis=1)
+
+    filename = publish_predictions(predicted_speeds, test_frames, filename, slope_threshold=0.4)
     display_video(filename)
     
     return "Success"
 
 if __name__ == "__main__":
     main()
-
-# TODO: broken
-def test_single_image():
-    frames = ld_testing_data()
-    
-    # Remove the second dimension
-    frames = np.squeeze(frames, axis=1)
-    print("frames.shape = ", frames.shape)
-    
-    image = frames[400]
-    superImposedImage = superimpose_image(18.01, image)
-    # display_image("superimposed", superImposedImage)
-    imageFinal = image_with_lanes(superImposedImage)
-    # display_image("final", imageFinal)
-    return imageFinal
