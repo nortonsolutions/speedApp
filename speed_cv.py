@@ -156,20 +156,6 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=3):
     
     return img 
 
-# Region of interest - return an image of only the region of interest, inside the vertices
-def region_of_interest(img, vertices):
-    # Define a blank mask to start with
-    
-    # print("img.shape in region_of_interest = ", img.shape)
-    mask = np.zeros_like(img)
-
-    # Fill the mask
-    cv2.fillPoly(mask, vertices, 255)
-
-    # Return the image only where the mask pixels are not zero
-    masked_image = cv2.bitwise_and(img, mask)
-    return masked_image
-
 # Grayscale the image
 def grayscale(img):
     # img = np.squeeze(img, axis=0)
@@ -344,13 +330,52 @@ def preprocess_frame(frame):
     edges = cv2.Canny(gray, 50, 150)
     return edges
 
+# Region of interest - return an image of only the region of interest, inside the vertices
+def region_of_interest(img, vertices):
+    # print("img.shape in region_of_interest = ", img.shape)
+    print("vertices = ", vertices)
+    # Define a blank mask to start with
+    
+    # print("img.shape in region_of_interest = ", img.shape)
+    mask = np.zeros_like(img)
+
+    # give me the OPPOSITE of the mask, the inverse
+    # antimask = cv2.bitwise_not(mask)
+
+    # Fill the mask
+    cv2.fillPoly(mask, vertices, 255)
+
+    # Return the image only where the mask pixels are not zero
+    masked_image = cv2.bitwise_and(img, mask)
+    return masked_image
+
+
 def define_roi(frame):
     print("define_roi: frame.shape = ", frame.shape)
     height = frame.shape[0]
     width = frame.shape[1]
+
+    print("height = ", height)
+    print("width = ", width)
     vertices = np.array(
-        [[(0, height-100), (width, height-100), (width/2, height*0.35)]], dtype=np.int32)
+        [[(0, height), (width, height), (width/2, height*0.35)]], dtype=np.int32)
     return vertices
+
+# def define_roi(frame):
+#     height = frame.shape[0]
+#     width = frame.shape[1]
+#     vertices = np.array(
+#         [[(0, height-50), (width, height-50), (width/2, height*0.8)]], dtype=np.int32)
+#     return vertices
+
+# def define_roi(frame):
+#     height = frame.shape[0]
+#     width = frame.shape[1]
+#     vertices = np.array(
+#         [[(0, height*0.6), (width, height*0.6), (width/2, height)]], dtype=np.int32)
+    
+#     return vertices
+
 
 def detect_lines(edges, roi):
     lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 20, minLineLength=70, maxLineGap=20)
@@ -375,7 +400,8 @@ def separate_lines(lines):
         x1, y1, x2, y2 = line[0]
         slope = (y2 - y1) / (x2 - x1)
         if slope < 0:
-            left_lines.append(line)
+            # left_lines.append(line)
+            print("skip left_lines.append(line) = ", line)
         else:
             right_lines.append(line)
     return left_lines, right_lines
@@ -405,6 +431,8 @@ def calculate_weighted_average_line(lines):
 
 
 def draw_lines(overlay, lines):
+    print("overlay.shape = ", overlay.shape)
+    print("lines = ", lines)
     for line in lines:
         print("line = ", line)
         if line is None:
@@ -428,9 +456,13 @@ def publish_predictions(lane_predictions, video_frames, filename, slope_threshol
     for i in range(num_frames):
         frame = video_frames[i]
         edges = preprocess_frame(frame)
-        vertices = define_roi(frame)
+        print("edges.shape = ", edges.shape, edges.dtype)
+
+        vertices = define_roi(edges)
+        print("vertices = ", vertices)
         roi = region_of_interest(edges, vertices)
-        
+        print("roi.shape = ", roi.shape, roi.dtype)
+
         lines = detect_lines(edges, roi)
         overlay = np.zeros_like(frame)
         

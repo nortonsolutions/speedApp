@@ -1,3 +1,4 @@
 data/
 .pyc
 speedTest_old/
+__pycache__/
