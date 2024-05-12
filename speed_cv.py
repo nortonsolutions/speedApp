@@ -7,19 +7,6 @@
 #
 # -----
 #
-# This file contains the functions for the computer vision part of the speedTest project.
-# The functions are used to identify the lanes in the image and draw them on the image.
-# The functions are used in the speed_cv.py file.
-# The functions are:
-# - # display_image: display an image in a window
-# - image_with_lanes: identify the lanes in the image and draw them on the image
-# - identify_line_slopes: identify the slopes of the contiguous white lines in the image
-# - draw_lines: draw the lines on the image
-# - region_of_interest: return an image of only the region of interest, inside the vertices
-# - grayscale: convert the image to grayscale
-# - gaussian_blur: apply Gaussian blur to the image
-# - canny: apply Canny edge detection to the image
-# - shrink_img: resize the image to 320x240 pixelscheckIfModelExists
 
 import dis
 from turtle import right

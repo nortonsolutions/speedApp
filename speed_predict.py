@@ -8,23 +8,11 @@
 # 
 # 0.001 - feb 2024: initial version
 # 0.002 - feb 2024: django WSGI app, more reporting
+# 0.003 - may 2024: fine tuning of model (including lane-direction prediction and speed prediction)
+# 0.004 - may 2024: prepare web response for async display to user after superimposing speed and lane predictions
+# 0.005 - may 2024: prepare for publishing, cleanup and final testing
 #
 # -----
-#
-# This file contains the functions for the machine learning part of the speedTest project.
-# The functions are used to train the model and test the model on the test data.
-# The functions are used in the speedTest.py file.
-# The functions are:
-# - create_model: create the model
-# - train_model: train the model on the training data
-# - test_model: test the model on the test data
-# - publish_predictions: superimpose the predictions on the testFrames, add the lanelines, and display the resulting video
-# - display_video: open the video and play it
-# - load_testing_data: load the testing data and return the frames
-# - load_training_data: load the training data
-# - check_if_model_exists: check if the model exists
-# - test_single_image: test a single image
-# - process_new_video: process a new video file, editing the video in place
 #
 #
 from cgi import test
