@@ -8,6 +8,9 @@ The output speed prediction for a given video file will be superimposed on the v
 **Project:** AI/Machine Learning capstone project - Speed and Lane Detection  
 **Objective:** Use Keras to train a model which can predict speed and laneline direction.
 
+<img src="screenshot.png" width="400"/>
+<img src="screenshot-2.png" width="400"/>
+
 ### Miscellaneous
 
 - Speed prediction AI is trained using Conv2D+TimeDistributed layers in a Sequential model (Keras)
