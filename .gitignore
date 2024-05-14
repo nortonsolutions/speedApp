@@ -3,3 +3,9 @@ data/
 speedTest_old/
 __pycache__/
 archive
+venv/
+launch.json
+.gitignore
+model.keras
+migrations/
+predictions.txt

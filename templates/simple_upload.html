@@ -1,0 +1,28 @@
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Videos</title>
+</head>
+
+<body>
+
+    <h1>Video Uploader</h1>
+    {% load static %}
+    <img src="{% static "midsummer.png" %}" alt="My image" width="300" height="200">
+    <form enctype="multipart/form-data" method="POST" action="">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <input type="submit" value="Upload" />
+    </form>
+
+    <br>
+    <video width='400' controls autoplay='none'>
+        <source src='{{ MEDIA_URL }}{{ form.instance.videofile.name }}' type='video/mp4'>
+        Your browser does not support the video tag.
+    </video>
+    <br>
+    </p>
+</body>
+
+</html>

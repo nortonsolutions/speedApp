@@ -45,9 +45,9 @@ testmode = True
 testmode_num_frames = 128
 resized_frame_length = 32
 
-test_filename = "speedApp/data/test.mp4"
-training_video = "speedApp/data/train.mp4"
-training_speeds = "speedApp/data/train.txt"
+test_filename = "data/test.mp4"
+training_video = "data/train.mp4"
+training_speeds = "data/train.txt"
 
 conv3d = False
 
