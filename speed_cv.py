@@ -211,7 +211,7 @@ def load_data(video_file, speeds_file, testmode=False, testmode_num_frames=128, 
     # frames = frames / 255.0
 
     print(video_file, speeds_file)
-    if speeds_file is None | speeds_file == '':
+    if speeds_file is None or speeds_file == '':
         speeds = None
     else:
         # Load the speed values
