@@ -45,9 +45,9 @@ testmode = True
 testmode_num_frames = 128
 resized_frame_length = 32
 
-test_filename = "data/test.mp4"
-training_video = "data/train.mp4"
-training_speeds = "data/train.txt"
+test_filename = os.getenv("TEST_FILENAME", "data/test.mp4")
+training_video = os.getenv("TRAINING_VIDEO", "data/train.mp4")
+training_speeds = os.getenv("TRAINING_SPEEDS", "data/train.txt")
 
 conv3d = False
 
