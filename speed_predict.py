@@ -28,6 +28,9 @@ from keras.callbacks import EarlyStopping
 
 from speedApp.speed_cv import load_data, display_video, publish_predictions
 from celery import shared_task
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # config = configparser.ConfigParser()
 # config.read('config.ini')
