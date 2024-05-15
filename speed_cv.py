@@ -388,9 +388,10 @@ def separate_lines(lines):
         x1, y1, x2, y2 = line[0]
         slope = (y2 - y1) / (x2 - x1)
         if slope < 0:
-            # left_lines.append(line)
-            print("skip left_lines.append(line) = ", line)
+            left_lines.append(line)
+            # print("skip left_lines.append(line) = ", line)
         else:
+            print("right_lines.append(line) = ", line)
             right_lines.append(line)
     return left_lines, right_lines
 
