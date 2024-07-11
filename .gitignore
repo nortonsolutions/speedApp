@@ -4,6 +4,7 @@ speedTest_old/
 __pycache__/
 archive
 venv/
+venv_broken/
 launch.json
 .gitignore
 model.keras

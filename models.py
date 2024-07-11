@@ -2,7 +2,7 @@ from typing import Iterable
 from django.db import models
 
 class Video(models.Model):
-    app_label='speedTest'
+    # app_label='speedTest'
     name= models.CharField(max_length=500)
     videofile= models.FileField(upload_to='videos/', null=True, verbose_name="")
 

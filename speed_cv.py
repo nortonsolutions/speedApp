@@ -108,13 +108,13 @@ def identify_line_slopes(img):
 def draw_lines(img, lines, color=[255, 0, 0], thickness=3):
     # Create a blank image that matches the original image
     # img = np.squeeze(img, axis=0)
-    print("img.shape in draw_lines = ", img.shape)
+    # print("img.shape in draw_lines = ", img.shape)
     
     line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
 
-    print("line_img.shape = ", line_img.shape)
-    print("img.shape in draw_lines = ", img.shape)
-    print("lines = ", lines)
+    # print("line_img.shape = ", line_img.shape)
+    # print("img.shape in draw_lines = ", img.shape)
+    # print("lines = ", lines)
 
     # Does lines contain any data?
     if lines is None:
@@ -132,9 +132,9 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=3):
     # print("line_img.shape = ", line_img.shape)
     # print("img.shape in draw_lines = ", img.shape)
     # describe lines, img, and line_img
-    print("lines: ", lines.shape, lines.dtype)
-    print("img: ", img.shape, img.dtype)
-    print("line_img: ", line_img.shape, line_img.dtype)
+    # print("lines: ", lines.shape, lines.dtype)
+    # print("img: ", img.shape, img.dtype)
+    # print("line_img: ", line_img.shape, line_img.dtype)
     
     # Overlay img and line_img
     img = cv2.addWeighted(img, 0.8, line_img, 1.0, 0.0)
@@ -146,7 +146,7 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=3):
 # Grayscale the image
 def grayscale(img):
     # img = np.squeeze(img, axis=0)
-    print("img.shape in grayscale = ", img.shape)
+    # print("img.shape in grayscale = ", img.shape)
     img_bw = img.astype(np.uint8)
     img_bw =  cv2.cvtColor(img_bw, cv2.COLOR_RGB2GRAY)
 
@@ -166,7 +166,7 @@ def shrink_img(img):
 
 def load_data(video_file, speeds_file, testmode=False, testmode_num_frames=128, batch_size=32):
 
-    print("Loading data for files: ", video_file, speeds_file)
+    # print("Loading data for files: ", video_file, speeds_file)
 
     # Load the video file
     cap = cv2.VideoCapture(video_file)
@@ -178,8 +178,8 @@ def load_data(video_file, speeds_file, testmode=False, testmode_num_frames=128, 
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    print("height = ", height)
-    print("width = ", width)
+    # print("height = ", height)
+    # print("width = ", width)
 
 
     # If the length of the first dimension of frames is less than a multiple of batch_size,
@@ -321,7 +321,7 @@ def preprocess_frame(frame):
 # Region of interest - return an image of only the region of interest, inside the vertices
 def region_of_interest(img, vertices):
     # print("img.shape in region_of_interest = ", img.shape)
-    print("vertices = ", vertices)
+    # print("vertices = ", vertices)
     # Define a blank mask to start with
     
     # print("img.shape in region_of_interest = ", img.shape)
@@ -339,12 +339,12 @@ def region_of_interest(img, vertices):
 
 
 def define_roi(frame):
-    print("define_roi: frame.shape = ", frame.shape)
+    # print("define_roi: frame.shape = ", frame.shape)
     height = frame.shape[0]
     width = frame.shape[1]
 
-    print("height = ", height)
-    print("width = ", width)
+    # print("height = ", height)
+    # print("width = ", width)
     vertices = np.array(
         [[(0, height), (width, height), (width/2, height*0.35)]], dtype=np.int32)
     return vertices
@@ -391,8 +391,13 @@ def separate_lines(lines):
             left_lines.append(line)
             # print("skip left_lines.append(line) = ", line)
         else:
-            print("right_lines.append(line) = ", line)
+            # print("right_lines.append(line) = ", line)
             right_lines.append(line)
+
+    # debug: print the last few left_lines and right_lines
+    print("left_lines = ", left_lines[-5:])
+    print("right_lines = ", right_lines[-5:])
+
     return left_lines, right_lines
 
 def calculate_weighted_average_line(lines):
@@ -420,10 +425,10 @@ def calculate_weighted_average_line(lines):
 
 
 def draw_lines(overlay, lines):
-    print("overlay.shape = ", overlay.shape)
-    print("lines = ", lines)
+    # print("overlay.shape = ", overlay.shape)
+    # print("lines = ", lines)
     for line in lines:
-        print("line = ", line)
+        # print("line = ", line)
         if line is None:
             continue
         if len(line) == 0:
@@ -449,7 +454,7 @@ def publish_predictions(lane_predictions, video_frames, filename, slope_threshol
         print("edges.shape = ", edges.shape, edges.dtype)
 
         vertices = define_roi(edges)
-        print("vertices = ", vertices)
+        # print("vertices = ", vertices)
         roi = region_of_interest(edges, vertices)
         print("roi.shape = ", roi.shape, roi.dtype)
 
@@ -460,7 +465,6 @@ def publish_predictions(lane_predictions, video_frames, filename, slope_threshol
             filtered_lines = filter_lines(lines, slope_threshold)
             left_lines, right_lines = separate_lines(filtered_lines)
             left_line = weighted_average_line(left_lines, previous_left_lines)
-            print("left_line = ", left_line)
             right_line = weighted_average_line(right_lines, previous_right_lines)
 
             previous_left_lines = left_lines
