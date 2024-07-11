@@ -2,7 +2,7 @@ from django.http import HttpResponse,HttpResponseRedirect
 from django.shortcuts import render
 
 from .forms import VideoForm, VideoFormWithModel
-from .speed_predict import process_new_video
+from .speedApp import process_new_video
 
 # from asgiref.sync import iscoroutinefunction, markcoroutinefunction
 

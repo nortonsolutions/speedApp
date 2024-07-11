@@ -438,6 +438,7 @@ def add_text(overlay, text):
     cv2.putText(overlay, str(text), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 0, 255), 2)
 
 def publish_predictions(lane_predictions, video_frames, filename, slope_threshold=0.4):
+    print(f"filename is {filename}")
     num_frames = len(video_frames)
     newVideo = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'XVID'), 20, (320, 240))
     previous_left_lines = None
