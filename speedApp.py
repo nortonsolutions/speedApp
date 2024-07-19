@@ -26,7 +26,7 @@ from keras.models import load_model
 # from src.backend.common import keras_tensor
 from keras.callbacks import EarlyStopping
 
-from .speed_cv import load_data, display_video, publish_predictions
+from speed_cv import load_data, display_video, publish_predictions
 from celery import shared_task
 # from dotenv import load_dotenv
 
@@ -44,7 +44,7 @@ epochs = 5
 batch_size = 32
 neurons = 32
 
-testmode = True
+testmode = False
 testmode_num_frames = 128
 resized_frame_length = 32
 
@@ -255,10 +255,18 @@ def train_model(model, frames, speeds, epochs=epochs, batch_size=batch_size):
             min_delta=0.001,  # Minimum change in the monitored quantity to qualify as an improvement
             restore_best_weights=True  # Restore model weights from the epoch with the best value
         )
+        # print variables:
+        print("frames.shape = ", frames.shape)
+        print("speeds.shape = ", speeds.shape)
+        print("epochs = ", epochs)
+        print("batch_size = ", batch_size)
+        print("early_stopping = ", early_stopping)
+        # print the model summary
+        model.summary()
 
         # model.fit(frames, speeds, epochs=epochs, batch_size=batch_size)
         model.fit(frames, speeds, epochs=epochs, batch_size=batch_size, 
-                shuffle=False, validation_split=0.3, callbacks=[early_stopping])
+                shuffle=False, validation_split=0.3, callbacks=[]) # early_stopping
         # , steps_per_epoch=frames.shape[0]//batch_size)
     except Exception as e:
         raise e
@@ -325,14 +333,12 @@ def main():
         except Exception as e:
             print("Exception in training model: ", e)
             raise e
-        
-        save_model(model, modelFile)
 
     model.summary()
 
     # # Save the model
     # model.save(modelFile)
-
+    save_model(model, modelFile)
     # Load testing data
     test_frames, _ = load_data(test_filename, None, testmode=testmode, testmode_num_frames=testmode_num_frames, batch_size=batch_size)
 
@@ -341,8 +347,9 @@ def main():
 
     print("predicted_speeds.shape = ", predicted_speeds.shape)
 
-    output_mp4_filename = "output.mp4" # lane_predictions, video_frames, filename, slope_threshold=0.4):
-    filename = publish_predictions(lane_predictions=predicted_speeds, video_frames=test_frames, filename=output_mp4_filename, slope_threshold=0.4)
+    test_frames = np.squeeze(test_frames, axis=1)
+    output_filename = "output.webm" # lane_predictions, video_frames, filename, slope_threshold=0.4):
+    filename = publish_predictions(lane_predictions=predicted_speeds, video_frames=test_frames, filename=output_filename, slope_threshold=0.4)
     # display_video(filename)
     
     # # Generate histogram of predicted speeds

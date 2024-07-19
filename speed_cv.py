@@ -276,9 +276,10 @@ def weighted_average_line(lines, prev_lines):
     # Calculate the distance between each line and the previous lines
      
     if prev_lines is None:
+        # prev_lines is the same shape as lines, but filled with zeros
         prev_lines = np.zeros_like(lines)
     
-    distances = np.array([np.min(np.linalg.norm(line - prev_lines, axis=1)) for line in lines])
+    distances = np.array([np.min(np.linalg.norm(prev_lines - line, axis=2)) for line in lines])
     if np.isnan(distances).any():
         distances = np.nan_to_num(distances, nan=1.0)
 
@@ -467,8 +468,7 @@ def publish_predictions(lane_predictions, video_frames, filename, slope_threshol
         os.remove(filename)
 
     newVideo = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'vp80'), 20, (320, 240))
-    previous_left_lines = None
-    previous_right_lines = None
+
     for i in range(num_frames):
         print("Processing frame", i)
         frame = video_frames[i]
@@ -483,7 +483,8 @@ def publish_predictions(lane_predictions, video_frames, filename, slope_threshol
         # display_image("roi", roi)
         lines = detect_lines(edges, roi)
         overlay = np.zeros_like(frame)
-        
+        previous_left_lines = None
+        previous_right_lines = None
         if lines is not None:
             filtered_lines = filter_lines(lines, slope_threshold)
             left_lines, right_lines = separate_lines(filtered_lines)
