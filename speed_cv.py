@@ -43,7 +43,7 @@ def image_with_lanes(image):
 
     # Apply Canny edge detection to the image
     edges = canny(blur, 50, 150)
-    print("edges.shape = ", edges.shape, edges.dtype)
+    # print("edges.shape = ", edges.shape, edges.dtype)
 
     # display_image("edges", edges)
 
@@ -56,18 +56,18 @@ def image_with_lanes(image):
     # Ignore everything outside the wedge
     roi = region_of_interest(edges, vertices)
 
-    print("roi.shape = ", roi.shape, roi.dtype)
+    # print("roi.shape = ", roi.shape, roi.dtype)
     # display_image("roi", roi)
 
     roi = np.expand_dims(roi, axis=2)
-    print("roi.shape = ", roi.shape, roi.dtype)
+    # print("roi.shape = ", roi.shape, roi.dtype)
 
     # display_image("roi", roi)
 
     # Identify contiguous line segments in the image, straight or curved
     lines = identify_line_slopes(roi)
     
-    print("before draw_lines image.shape = ", image.shape, image.dtype)
+    # print("before draw_lines image.shape = ", image.shape, image.dtype)
 
     # Draw the lines on the image
     # display_image("image", image)
@@ -76,7 +76,7 @@ def image_with_lanes(image):
 
     # display_image("line_image", line_image)
 
-    print("line_image.shape = ", line_image.shape, line_image.dtype)
+    # print("line_image.shape = ", line_image.shape, line_image.dtype)
     
     output = line_image
     return output
@@ -270,7 +270,7 @@ def publish_predictions_orig(predictions, testFrames, filename):
 #     return np.sum(weighted_lines, axis=0).astype(np.int32)[0]
 
 def weighted_average_line(lines, prev_lines):
-    if not lines:
+    if not lines or len(lines) == 0:
         return None
 
     # Calculate the distance between each line and the previous lines
@@ -279,15 +279,26 @@ def weighted_average_line(lines, prev_lines):
         prev_lines = np.zeros_like(lines)
     
     distances = np.array([np.min(np.linalg.norm(line - prev_lines, axis=1)) for line in lines])
+    if np.isnan(distances).any():
+        distances = np.nan_to_num(distances, nan=1.0)
+
 
     # Calculate the weights based on the distances
-    weights = np.exp(-distances / np.mean(distances))
+    mean = np.mean(distances)
+
+    if (mean == 0):
+        mean = 0.01
+
+    weights = np.exp(-distances / mean)
 
     # Normalize the weights
     weights /= np.sum(weights)
 
     # Calculate the weighted average line
     weighted_lines = np.array([line * w for line, w in zip(lines, weights)])
+    if np.isnan(weighted_lines).any() or np.isinf(weighted_lines).any():
+        return None
+
     return np.sum(weighted_lines, axis=0).astype(np.int32)[0]
 
 
@@ -395,8 +406,8 @@ def separate_lines(lines):
             right_lines.append(line)
 
     # debug: print the last few left_lines and right_lines
-    print("left_lines = ", left_lines[-5:])
-    print("right_lines = ", right_lines[-5:])
+    # print("left_lines = ", left_lines[-5:])
+    # print("right_lines = ", right_lines[-5:])
 
     return left_lines, right_lines
 
@@ -445,19 +456,31 @@ def add_text(overlay, text):
 def publish_predictions(lane_predictions, video_frames, filename, slope_threshold=0.4):
     print(f"filename is {filename}")
     num_frames = len(video_frames)
-    newVideo = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'XVID'), 20, (320, 240))
+
+        
+    # prepend "project/media/videos/" to the filename
+    filename = "project/media/videos/" + filename
+    # if file exists, print warning and delete it
+    import os
+    if os.path.exists(filename):
+        print(f"Warning: {filename} already exists. Deleting it.")
+        os.remove(filename)
+
+    newVideo = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'vp80'), 20, (320, 240))
     previous_left_lines = None
     previous_right_lines = None
     for i in range(num_frames):
+        print("Processing frame", i)
         frame = video_frames[i]
         edges = preprocess_frame(frame)
-        print("edges.shape = ", edges.shape, edges.dtype)
+        # display_image("edges", edges)
+        # print("edges.shape = ", edges.shape, edges.dtype)
 
         vertices = define_roi(edges)
         # print("vertices = ", vertices)
         roi = region_of_interest(edges, vertices)
-        print("roi.shape = ", roi.shape, roi.dtype)
-
+        # print("roi.shape = ", roi.shape, roi.dtype)
+        # display_image("roi", roi)
         lines = detect_lines(edges, roi)
         overlay = np.zeros_like(frame)
         
@@ -473,10 +496,13 @@ def publish_predictions(lane_predictions, video_frames, filename, slope_threshol
             draw_lines(overlay, [left_line, right_line])
 
         add_text(overlay, lane_predictions[i])
+        # display_image("overlay", overlay)
         combined_frame = combine_frame_and_overlay(frame, overlay)
+        # display_image("combined_frame", combined_frame)
         newVideo.write(combined_frame)
 
     newVideo.release()
+    print("filename = ", filename)
     return filename
 
 # Currently unused

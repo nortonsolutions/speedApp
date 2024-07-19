@@ -341,7 +341,8 @@ def main():
 
     print("predicted_speeds.shape = ", predicted_speeds.shape)
 
-    filename = publish_predictions(predicted_speeds, test_frames, modelFile, slope_threshold=0.4)
+    output_mp4_filename = "output.mp4" # lane_predictions, video_frames, filename, slope_threshold=0.4):
+    filename = publish_predictions(lane_predictions=predicted_speeds, video_frames=test_frames, filename=output_mp4_filename, slope_threshold=0.4)
     # display_video(filename)
     
     # # Generate histogram of predicted speeds
@@ -355,7 +356,7 @@ def main():
 
 # processNewVideo will process a new video file, editing the video in place
 @shared_task
-def process_new_video(filename):
+async def process_new_video(filename):
 
     model_exists, model = check_if_model_exists(modelFile)
 
@@ -385,11 +386,10 @@ def process_new_video(filename):
     print("predicted_speeds.shape = ", predicted_speeds.shape)
 
     test_frames = np.squeeze(test_frames, axis=1)
-
-    filename = publish_predictions(predicted_speeds, test_frames, filename, slope_threshold=0.4)
+    filename = publish_predictions(lane_predictions=predicted_speeds, video_frames=test_frames, filename=filename, slope_threshold=0.4)
     # display_video(filename)
     
-    return "Success"
+    return filename
 
 if __name__ == "__main__":
     main()

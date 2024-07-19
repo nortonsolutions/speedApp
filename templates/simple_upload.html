@@ -9,20 +9,66 @@
 
     <h1>Video Uploader</h1>
     {% load static %}
-    <img src="{% static "midsummer.png" %}" alt="My image" width="300" height="200">
+    <!-- <img src="{% static "midsummer.png" %}" alt="My image" width="300" height="200"> -->
+    <p>Sample video:</p>
+    <video width='300' controls preload='none'>
+        <source src="{% static "test.mp4" %}" type='video/mp4'>
+        Your browser does not support the video tag.
+    </video>
     <form enctype="multipart/form-data" method="POST" action="">
+        Use default video:
+        <input type="button" id="default_video" value="Use Default Video" />
         {% csrf_token %}
         {{ form.as_p }}
         <input type="submit" value="Upload" />
+        <input type="hidden" id="video_filename" value="{{ video_filename }}">
     </form>
 
-    <br>
-    <video width='400' controls autoplay='none'>
-        <source src='{{ MEDIA_URL }}{{ form.instance.videofile.name }}' type='video/mp4'>
+    <br>{{app_name}}
+    {% if form.instance.videofile.name %}
+    <video width='300' controls preload='none'>
+        <source src='' id='video_source' type='video/mp4'>
+        <!-- /{{app_name}}{{ MEDIA_URL}}{{form.instance.videofile.name }} -->
         Your browser does not support the video tag.
     </video>
+    {% endif %}
     <br>
     </p>
+
+    <button onclick="reloadVideo()">Reload Video</button>
 </body>
 
+<script>
+
+    // hijack the form submission with fetch, retrieve from json response the video url and set it to the video source, then reload the video
+    document.querySelector('form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        fetch('', {
+            method: 'POST',
+            body: new FormData(document.querySelector('form')),
+        }).then(response => {
+            return response.text()
+        }).then(data => {
+            // force reload/fefresh the video
+            // render data to the browser window -- not just the body, the WHOLE html page will be replaced starting with <html>
+            document.open();
+            document.write(data);
+            document.close();
+            
+        }).then(() => {
+            filename = document.getElementById('video_filename').value;
+            filename = filename.replace("project/", "")
+            document.getElementById('video_source').src = '/{{app_name}}/' + filename; //  + '?t=' + new Date().getTime();
+            document.querySelector('video').load();
+        });
+    });
+
+    function reloadVideo() {
+        filename = document.getElementById('video_filename').value;
+        filename = filename.replace("project/", "")
+        document.getElementById('video_source').src = '/{{app_name}}/' + filename; //  + '?t=' + new Date().getTime();
+        document.querySelector('video').load();
+    }
+    
+</script>
 </html>

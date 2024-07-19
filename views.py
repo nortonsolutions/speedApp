@@ -1,5 +1,6 @@
 from django.http import HttpResponse,HttpResponseRedirect
 from django.shortcuts import render
+import asyncio
 
 from .forms import VideoForm, VideoFormWithModel
 from .speedApp import process_new_video
@@ -56,9 +57,9 @@ def index(request):
     # print("index")
     # if this is a POST request we need to process the form data
     if request.method == "POST":
-        # create a form instance and populate it with data from the request:
         form = VideoFormWithModel(request.POST, request.FILES)
         if form.is_valid():
+            print("form is valid")
             # With model:
             if not form.save():
             # old method: handle the file upload manually
@@ -68,10 +69,13 @@ def index(request):
             print("file upload successful")
             
             # Process the video with the model
-            err = process_new_video(form.instance.videofile.path)
-            print(err)
+            video_filename = asyncio.run(process_new_video(filename="output.webm"))
+            print(f"video_filename: {video_filename}")
             
-            return render(request, "simple_upload.html", {"form": form})
+            # force reload on this rendering:
+            context = {"form": form, "app_name": "speedApp", "video_filename": video_filename}
+            return render(request, "simple_upload.html", context)
+
         else:
             print("form not valid")
     else:
@@ -80,7 +84,7 @@ def index(request):
         #     "videofile": "nortonTrafficDetection.mp4",
         # }
         form = VideoFormWithModel()
-        return render(request, "simple_upload.html", {"form": form})
+        return render(request, "simple_upload.html", {"form": form, "app_name": "speedApp"})
 
 # markcoroutinefunction(index)
 # def static(request):
